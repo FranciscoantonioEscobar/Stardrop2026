@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stardrop</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    html, body {
+      width:100%; height:100%; overflow:hidden; color:#fff;
+      font-family:system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      touch-action:manipulation;
+    }
+    .media-container {
+      width:100vw; height:100vh;
+      position:fixed; inset:0;
+      display:flex; align-items:center; justify-content:center;
+      cursor:pointer; user-select:none;
+      background:#000;
+      transition:background 1.8s ease-in-out;
+    }
+    .media-layer {
+      width:100%; height:100%;
+      position:absolute; inset:0;
+      display:flex; align-items:center; justify-content:center;
+      pointer-events:none;
+      transition:opacity 0.6s ease-in-out;
+    }
+    img.preview, video {
+      width:100%; height:100%;
+      object-fit: cover;          /* ← Cambio aquí: ahora llena toda la pantalla */
+      object-position: center;
+    }
+    .final-screen {
+      position:fixed; inset:0;
+      display:flex; align-items:center; justify-content:center;
+      font-size:clamp(4.5rem, 15vw, 13rem); font-weight:900;
+      text-align:center; text-shadow:0 8px 50px rgba(0,0,0,0.9);
+      color:#fff; opacity:0; transition:opacity 2s ease;
+      pointer-events:none; z-index:10; padding:0 5vw;
+    }
+    .final-screen.visible { opacity:1; }
+    .nuevo-intento {
+      position:fixed; bottom:4rem; right:4rem;
+      padding:1.4rem 3.8rem; font-size:1.45rem; font-weight:bold;
+      background:linear-gradient(145deg, #7b5eff, #b06eff);
+      color:#fff; border:none; border-radius:999px; cursor:pointer;
+      display:none; box-shadow:0 12px 45px rgba(0,0,0,0.7);
+      transition:all 0.5s ease; z-index:20;
+    }
+    .nuevo-intento:hover {
+      transform:translateY(-7px) scale(1.06);
+      box-shadow:0 20px 55px rgba(0,0,0,0.8);
+    }
+    .circulos {
+      position:fixed; bottom:2.2rem; left:50%; transform:translateX(-50%);
+      display:flex; gap:2.2rem; z-index:15; pointer-events:none;
+    }
+    .circulo {
+      width:34px; height:34px; border-radius:50%;
+      border:4px solid rgba(255,255,255,0.92); transition:all 0.7s ease;
+    }
+    .circulo.usado {
+      opacity:0.55; transform:scale(0.6); border-color:rgba(220,220,220,0.65);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="media-container" id="mediaContainer">
+    <div class="media-layer" id="previewLayer">
+      <img class="preview" id="previewImg" src="especial.jpeg" alt="">
+    </div>
+    <div class="media-layer" id="videoLayer" style="opacity:0;">
+      <video id="videoPlayer" playsinline preload="auto"></video>
+    </div>
+  </div>
+
+  <div class="circulos" id="circulos"></div>
+
+  <div class="final-screen" id="finalScreen"></div>
+
+  <button class="nuevo-intento" id="nuevoIntentoBtn">Nuevo intento</button>
+
+<script>
+const niveles = [
+  {
+    nombre: "ESPECIAL",
+    preview: "especial.jpeg",
+    video: "especial_video.mp4",
+    color: "#98FF98"   // verde vibrante como en tu imagen
+  },
+  {
+    nombre: "ÉPICO",
+    preview: "epico.jpeg",
+    video: "epico_video.mp4",
+    color: "#FFEA00"
+  },
+  {
+    nombre: "LEGENDARIO",
+    preview: "legendario.jpeg",
+    video: "legendario_video.mp4",
+    color: "#FF0099"
+  }
+];
+
+let intentos = 0;
+let nivelActual = 0;
+let estaProcesando = false;
+let videoEstaReproduciendo = false;
+
+const mediaContainer = document.getElementById("mediaContainer");
+const previewLayer   = document.getElementById("previewLayer");
+const videoLayer     = document.getElementById("videoLayer");
+const previewImg     = document.getElementById("previewImg");
+const videoPlayer    = document.getElementById("videoPlayer");
+const finalScreen    = document.getElementById("finalScreen");
+const circulos       = document.getElementById("circulos");
+const nuevoBtn       = document.getElementById("nuevoIntentoBtn");
+
+function crearCirculos() {
+  circulos.innerHTML = "";
+  for (let i = 0; i < 4; i++) {
+    const c = document.createElement("div");
+    c.classList.add("circulo");
+    circulos.appendChild(c);
+  }
+}
+
+function actualizarVista() {
+  const nivel = niveles[nivelActual];
+  previewImg.src = nivel.preview;
+  videoPlayer.src = nivel.video;
+  videoPlayer.load();
+  mediaContainer.style.background = nivel.color;
+}
+
+function reproducirVideo(callbackOnEnd) {
+  if (videoEstaReproduciendo) return;
+  videoEstaReproduciendo = true;
+
+  previewLayer.style.opacity = "0";
+  setTimeout(() => {
+    videoLayer.style.opacity = "1";
+  }, 300);
+
+  videoPlayer.currentTime = 0;
+  videoPlayer.play().catch(err => console.warn("Error play:", err));
+
+  videoPlayer.onended = () => {
+    videoEstaReproduciendo = false;
+    videoLayer.style.opacity = "0";
+    setTimeout(() => {
+      previewLayer.style.opacity = "1";
+      if (callbackOnEnd) callbackOnEnd();
+    }, 600);
+  };
+}
+
+function intentarMejorar() {
+  if (nivelActual >= 2) return 2;
+  const prob = nivelActual === 0 ? 0.60 : 0.35;
+  return Math.random() < prob ? nivelActual + 1 : nivelActual;
+}
+
+function mostrarPantallaFinal() {
+  const nivel = niveles[nivelActual];
+  previewLayer.style.opacity = "0";
+  videoLayer.style.opacity = "0";
+  mediaContainer.style.background = nivel.color;
+
+  finalScreen.textContent = `Tu premio es ${nivel.nombre}`;
+  finalScreen.classList.add("visible");
+  nuevoBtn.style.display = "block";
+}
+
+function clickIntento() {
+  if (intentos >= 4 || estaProcesando || videoEstaReproduciendo) return;
+  estaProcesando = true;
+
+  intentos++;
+  if (circulos.children[intentos - 1]) {
+    circulos.children[intentos - 1].classList.add("usado");
+  }
+
+  nivelActual = intentarMejorar();
+  actualizarVista();
+
+  reproducirVideo(() => {
+    if (intentos === 4 || nivelActual === 2) {
+      setTimeout(mostrarPantallaFinal, 1000);
+    } else {
+      estaProcesando = false;
+    }
+  });
+}
+
+function reiniciar() {
+  intentos = 0;
+  nivelActual = 0;
+  estaProcesando = false;
+  videoEstaReproduciendo = false;
+
+  mediaContainer.style.background = "#000";
+  previewLayer.style.opacity = "1";
+  videoLayer.style.opacity = "0";
+  finalScreen.classList.remove("visible");
+  nuevoBtn.style.display = "none";
+
+  crearCirculos();
+  actualizarVista();
+}
+
+mediaContainer.addEventListener("click", clickIntento);
+nuevoBtn.addEventListener("click", reiniciar);
+
+// Inicio
+crearCirculos();
+actualizarVista();
+</script>
+</body>
+</html>
